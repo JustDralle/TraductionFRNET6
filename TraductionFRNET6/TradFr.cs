@@ -1,88 +1,105 @@
-﻿// Runtime translation patch for Unity Il2Cpp (MelonLoader + Harmony)
-// Customized for Schedule I - Coded by Dralle
-
 using MelonLoader;
 using HarmonyLib;
-using Il2CppTMPro;
+using UnityEngine;
 using UnityEngine.UI;
+using Il2CppTMPro;
+using Newtonsoft.Json;
 using System.Collections.Generic;
 using System.IO;
-using Newtonsoft.Json;
-using Il2CppSystem;
-using System.Reflection;
+using System.Linq;
 using MelonLoader.Utils;
 
-[assembly: MelonInfo(typeof(Localization.Main), "LocalizationPatch", "1.1.2", "Dralle")]
+[assembly: MelonInfo(typeof(TranslationPatch.Main), "FR Translation Patch", "1.0.0", "Dralle")]
 [assembly: MelonGame("TVGS", "Schedule I")]
 
-namespace Localization
+namespace TranslationPatch
 {
     public class Main : MelonMod
-    {
+{
         public override void OnInitializeMelon()
         {
-            LocalizationManager.Load();
+            TranslationManager.Load();
+
+            var harmony = new HarmonyLib.Harmony("fr.translation.patch");
+            harmony.PatchAll();
+
+            MelonLogger.Msg("Translation system loaded and patched.");
         }
+
+
+        public override void OnUpdate()
+         {
+             TranslationManager.ApplyTranslations();
+         }
+
     }
 
-    public static class LocalizationManager
+
+    public static class TranslationManager
     {
-        private static Dictionary<string, string> translations = new Dictionary<string, string>();
+        private static Dictionary<string, string> translations = new();
+        private static HashSet<Il2CppSystem.Object> alreadyTranslated = new();
 
         public static void Load()
         {
             string path = Path.Combine(MelonEnvironment.UserDataDirectory, "fr.json");
-            if (File.Exists(path))
+
+            if (!File.Exists(path))
+            {
+                MelonLogger.Warning("Translation file not found!");
+                return;
+            }
+
+            try
             {
                 string json = File.ReadAllText(path);
                 translations = JsonConvert.DeserializeObject<Dictionary<string, string>>(json);
-                MelonLogger.Msg($"Loaded {translations.Count} translation entries.");
+                MelonLogger.Msg($"[Trad] {translations.Count} entries loaded.");
             }
-            else
+            catch (System.Exception ex)
             {
-                MelonLogger.Warning("Translation file 'fr.json' not found.");
+                MelonLogger.Error($"Failed to load translation file: {ex.Message}");
             }
         }
 
         public static string Translate(string original)
         {
             if (string.IsNullOrWhiteSpace(original)) return original;
-            var cleaned = original.Trim();
-            return translations.TryGetValue(cleaned, out var value) ? value : original;
-        }
-    }
-
-    [HarmonyPatch]
-    public class Patch_TMP_Text
-    {
-        static MethodBase TargetMethod()
-        {
-            return AccessTools.PropertySetter(typeof(TextMeshProUGUI), "text");
+            string key = original.Trim();
+            return translations.TryGetValue(key, out var value) && !string.IsNullOrEmpty(value) ? value : original;
         }
 
-        public static void Prefix(ref Il2CppSystem.String value)
+        public static void ApplyTranslations()
         {
-            var original = value?.ToString();
-            MelonLogger.Msg($"[TMP] Intercepted text: {original}");
-            var translated = LocalizationManager.Translate(original);
-            value = translated;
-        }
-    }
+            foreach (var tmp in GameObject.FindObjectsOfType<TextMeshProUGUI>())
+            {
+                if (tmp == null || alreadyTranslated.Contains(tmp)) continue;
 
-    [HarmonyPatch]
-    public class Patch_UI_Text
-    {
-        static MethodBase TargetMethod()
-        {
-            return AccessTools.PropertySetter(typeof(Text), "text");
-        }
+                string current = tmp.text?.Trim();
+                if (string.IsNullOrWhiteSpace(current)) continue;
 
-        public static void Prefix(ref Il2CppSystem.String value)
-        {
-            var original = value?.ToString();
-            MelonLogger.Msg($"[UI.Text] Intercepted text: {original}");
-            var translated = LocalizationManager.Translate(original);
-            value = translated;
+                string translated = Translate(current);
+                if (translated != current)
+                {
+                    tmp.text = translated;
+                    alreadyTranslated.Add(tmp);
+                }
+            }
+
+            foreach (var ui in GameObject.FindObjectsOfType<Text>())
+            {
+                if (ui == null || alreadyTranslated.Contains(ui)) continue;
+
+                string current = ui.text?.Trim();
+                if (string.IsNullOrWhiteSpace(current)) continue;
+
+                string translated = Translate(current);
+                if (translated != current)
+                {
+                    ui.text = translated;
+                    alreadyTranslated.Add(ui);
+                }
+            }
         }
     }
 }
