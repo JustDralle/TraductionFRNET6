@@ -5,6 +5,19 @@ Originally built for **Schedule I**, this mod intercepts UI texts (`TextMeshProU
 
 ---
 
+
+📜 License & Copyright
+This project is licensed under the "Don't Be A Leech" license.
+
+You are not allowed to copy, modify, redistribute, re-upload, or otherwise use this code — in part or in full — without explicit written consent from the author.
+
+If you want to collaborate, contribute, or fork it for a related project, just ask.
+I'm chill. But theft isn't.
+
+
+---
+
+
 ## ✨ Features
 
 - Patches `text` setters at runtime using Harmony
